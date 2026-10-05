@@ -40,9 +40,18 @@ export async function createStream(userId, { title, category = 'Sneaker', coverI
   store.currentStreamId = stream._id;
   await store.save();
 
+  await stream.populate('featuredProducts');
+  await stream.populate('activePinnedProduct');
+
   const tokens = getStreamUserTokens(userId, 'host');
 
-  return { stream, tokens, streamToken: tokens.videoToken, chatToken: tokens.chatToken };
+  return {
+    stream,
+    tokens,
+    apiKey: tokens.apiKey,
+    streamToken: tokens.videoToken,
+    chatToken: tokens.chatToken,
+  };
 }
 
 export async function endStream(userId, streamId, io = null) {
@@ -88,6 +97,7 @@ export async function getActiveStreams({ category, search = '', page = 1, limit 
   const [streams, total] = await Promise.all([
     Stream.find(query)
       .populate('store', 'storeName sellerName avatar rating')
+      .populate('featuredProducts')
       .populate('activePinnedProduct')
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -115,7 +125,13 @@ export async function joinStream(userId, streamId, io = null) {
   }
 
   const tokens = getStreamUserTokens(userId, 'user');
-  return { stream, tokens, streamToken: tokens.videoToken, chatToken: tokens.chatToken };
+  return {
+    stream,
+    tokens,
+    apiKey: tokens.apiKey,
+    streamToken: tokens.videoToken,
+    chatToken: tokens.chatToken,
+  };
 }
 
 export async function leaveStream(userId, streamId, io = null) {

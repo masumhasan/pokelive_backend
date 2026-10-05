@@ -52,17 +52,71 @@ export async function dismissReport(reportId) {
   return report;
 }
 
+const DEFAULT_TERMS = `These Terms and Conditions govern your use of PokéLive. By accessing or using our platform, you agree to be bound by these terms. PokéLive provides a marketplace for collectibles, live events, and community interactions.
+
+1. Eligibility: You must be at least 18 years old to use PokéLive.
+
+2. Account Responsibility: You are responsible for maintaining the confidentiality of your account credentials.
+
+3. Prohibited Activities: Users may not engage in fraudulent listings, misrepresentation of items, or any activity that violates applicable laws.
+
+4. Payments: All transactions are processed securely. PokéLive is not liable for payment failures caused by third-party processors.
+
+5. Dispute Resolution: Any disputes will be resolved through binding arbitration in accordance with applicable law.
+
+6. Modifications: PokéLive reserves the right to update these terms at any time with reasonable notice.`;
+
+const DEFAULT_PRIVACY = `Your privacy is important to us. This Privacy Policy explains how PokéLive collects, uses, and protects your personal information.
+
+1. Information We Collect: We collect personal information such as name, email, shipping address, and payment details when you register or make a purchase.
+
+2. How We Use Your Information: We use your data to process orders, improve our platform, and communicate important updates.
+
+3. Data Sharing: We do not sell your personal data. We may share information with trusted partners for payment processing and delivery services.
+
+4. Cookies: We use cookies to enhance your browsing experience and analyze traffic patterns.
+
+5. Data Security: We implement industry-standard security measures to protect your data.
+
+6. Your Rights: You may request access to, correction, or deletion of your personal data at any time by contacting our support team.`;
+
 export async function getLegalSettings() {
   const settings = await PlatformSetting.find().lean();
-  const map = {};
+  const map = {
+    terms_and_conditions: DEFAULT_TERMS,
+    terms: DEFAULT_TERMS,
+    privacy_policy: DEFAULT_PRIVACY,
+    privacy: DEFAULT_PRIVACY,
+    support_emails: 'support@pokelive.com, help@pokelive.com',
+  };
   settings.forEach((s) => {
     map[s.key] = s.value;
+    if (s.key === 'terms_and_conditions') map.terms = s.value;
+    if (s.key === 'terms') map.terms_and_conditions = s.value;
+    if (s.key === 'privacy_policy') map.privacy = s.value;
+    if (s.key === 'privacy') map.privacy_policy = s.value;
   });
   return map;
 }
 
 export async function updateLegalSetting(key, value) {
-  return PlatformSetting.findOneAndUpdate({ key }, { $set: { value } }, { upsert: true, new: true }).lean();
+  const setting = await PlatformSetting.findOneAndUpdate(
+    { key },
+    { $set: { value } },
+    { upsert: true, new: true }
+  ).lean();
+
+  if (key === 'terms_and_conditions') {
+    await PlatformSetting.findOneAndUpdate({ key: 'terms' }, { $set: { value } }, { upsert: true });
+  } else if (key === 'terms') {
+    await PlatformSetting.findOneAndUpdate({ key: 'terms_and_conditions' }, { $set: { value } }, { upsert: true });
+  } else if (key === 'privacy_policy') {
+    await PlatformSetting.findOneAndUpdate({ key: 'privacy' }, { $set: { value } }, { upsert: true });
+  } else if (key === 'privacy') {
+    await PlatformSetting.findOneAndUpdate({ key: 'privacy_policy' }, { $set: { value } }, { upsert: true });
+  }
+
+  return setting;
 }
 
 export async function getDashboardStats() {

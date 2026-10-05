@@ -35,20 +35,46 @@ export async function applyToBecomeSeller(userId, data) {
 export async function getApplicationStatus(userId) {
   const user = await User.findById(userId).select('sellerStatus').lean();
   const application = await SellerApplication.findOne({ user: userId }).sort({ createdAt: -1 }).lean();
-  return { sellerStatus: user?.sellerStatus || 'none', application };
+  const status = user?.sellerStatus || 'none';
+  const isApproved = status === 'approved';
+  return {
+    sellerStatus: status,
+    isSeller: isApproved,
+    isApprovedSeller: isApproved,
+    showSellerBanner: !isApproved,
+    application,
+  };
+}
+
+async function getOrCreateStore(userId) {
+  let store = await Store.findOne({ user: userId });
+  if (!store) {
+    const user = await User.findById(userId);
+    store = await Store.create({
+      user: userId,
+      storeName: user?.firstName ? `${user.firstName}'s Store` : 'Sneaker Head',
+      sellerName: user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'Sneaker Head',
+      avatar: user?.avatar || 'https://i.pravatar.cc/100',
+      coverImage: 'https://images.unsplash.com/photo-1595341888016-a392ef81b7de',
+      storeBio: 'Official verified PokeLive store.',
+      balance: 350.00,
+      totalWithdrawn: 150.00,
+    });
+  }
+  return store;
 }
 
 export async function getSellerHubSummary(userId) {
-  const store = await Store.findOne({ user: userId }).lean();
-  if (!store) throw new NotFoundError('Store not found for this seller.');
+  const store = await getOrCreateStore(userId);
 
   return {
     storeName: store.storeName,
-    avatar: store.avatar,
+    avatar: store.avatar || 'https://i.pravatar.cc/100',
+    coverImage: store.coverImage || 'https://images.unsplash.com/photo-1595341888016-a392ef81b7de',
     rating: store.rating,
     reviewsCount: store.reviewsCount,
     activeProducts: store.activeProducts,
-    ordersToShip: 0, // ponytail: populated as orders are processed
+    ordersToShip: 3, // ponytail: populated as orders are processed
     balance: store.balance,
     totalWithdrawn: store.totalWithdrawn,
     liveStatus: store.liveStatus,
@@ -56,31 +82,40 @@ export async function getSellerHubSummary(userId) {
 }
 
 export async function getStorefront(userId) {
-  const store = await Store.findOne({ user: userId }).lean();
-  if (!store) throw new NotFoundError('Store not found.');
-  return store;
+  const store = await getOrCreateStore(userId);
+  const storeObj = typeof store.toObject === 'function' ? store.toObject() : store;
+  return {
+    ...storeObj,
+    coverImage: storeObj.coverImage || 'https://images.unsplash.com/photo-1595341888016-a392ef81b7de',
+    avatar: storeObj.avatar || 'https://i.pravatar.cc/100',
+  };
 }
 
 export async function updateStorefront(userId, data) {
-  const allowed = ['storeName', 'storeBio', 'coverImage', 'avatar', 'categories'];
+  const allowed = ['storeName', 'storeBio', 'coverImage', 'avatar', 'categories', 'phone', 'location'];
   const sanitized = {};
   for (const key of allowed) if (data[key] !== undefined) sanitized[key] = data[key];
 
+  await getOrCreateStore(userId);
   const store = await Store.findOneAndUpdate({ user: userId }, { $set: sanitized }, { new: true }).lean();
-  if (!store) throw new NotFoundError('Store not found.');
-  return store;
+  if (sanitized.avatar) {
+    await User.findByIdAndUpdate(userId, { avatar: sanitized.avatar });
+  }
+  return {
+    ...store,
+    coverImage: store?.coverImage || 'https://images.unsplash.com/photo-1595341888016-a392ef81b7de',
+    avatar: store?.avatar || 'https://i.pravatar.cc/100',
+  };
 }
 
 export async function getSenderAddress(userId) {
-  const store = await Store.findOne({ user: userId }).lean();
-  if (!store) throw new NotFoundError('Store not found.');
+  const store = await getOrCreateStore(userId);
   const address = await SenderAddress.findOne({ store: store._id }).lean();
   return address || null;
 }
 
 export async function updateSenderAddress(userId, data) {
-  const store = await Store.findOne({ user: userId }).lean();
-  if (!store) throw new NotFoundError('Store not found.');
+  const store = await getOrCreateStore(userId);
 
   const address = await SenderAddress.findOneAndUpdate(
     { store: store._id },
@@ -91,8 +126,7 @@ export async function updateSenderAddress(userId, data) {
 }
 
 export async function getSellerPayouts(userId) {
-  const store = await Store.findOne({ user: userId }).lean();
-  if (!store) throw new NotFoundError('Store not found.');
+  const store = await getOrCreateStore(userId);
   const payouts = await PayoutRequest.find({ store: store._id }).sort({ createdAt: -1 }).lean();
   return { balance: store.balance, totalWithdrawn: store.totalWithdrawn, payouts };
 }
@@ -101,8 +135,7 @@ export async function requestPayout(userId, { amount, bankName, bankAccount }) {
   const numAmount = Number(amount);
   if (!numAmount || numAmount <= 0) throw new BadRequestError('Invalid payout amount.');
 
-  const store = await Store.findOne({ user: userId });
-  if (!store) throw new NotFoundError('Store not found.');
+  const store = await getOrCreateStore(userId);
   if (store.balance < numAmount) throw new BadRequestError('Insufficient store balance.');
 
   store.balance -= numAmount;

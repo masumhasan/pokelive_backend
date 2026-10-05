@@ -14,11 +14,7 @@ export function getStreamUserTokens(userId, role = 'user') {
   const expiration = Math.floor(Date.now() / 1000) + validitySeconds;
 
   const chatToken = chatClient.createToken(String(userId), expiration);
-  const videoToken = videoClient.createToken({
-    user_id: String(userId),
-    role: role === 'host' || role === 'admin' ? 'admin' : 'user',
-    validity_in_seconds: validitySeconds,
-  });
+  const videoToken = videoClient.createToken(String(userId), expiration);
 
   return {
     apiKey: env.streamApiKey,

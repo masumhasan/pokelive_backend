@@ -33,6 +33,9 @@ export async function registerUser({ firstName, lastName, email, phone, password
 
   const safeUser = user.toObject();
   delete safeUser.password;
+  safeUser.isSeller = false;
+  safeUser.isApprovedSeller = false;
+  safeUser.showSellerBanner = true;
 
   return { user: safeUser, token, stream };
 }
@@ -67,6 +70,10 @@ export async function loginUser({ email, password }) {
 
   const safeUser = user.toObject();
   delete safeUser.password;
+  const isApproved = user.sellerStatus === 'approved';
+  safeUser.isSeller = isApproved;
+  safeUser.isApprovedSeller = isApproved;
+  safeUser.showSellerBanner = !isApproved;
 
   return { user: safeUser, token, stream };
 }

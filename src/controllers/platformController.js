@@ -49,8 +49,18 @@ export async function getLegal(req, res, next) {
 
 export async function updateLegal(req, res, next) {
   try {
-    const { key, value } = req.body;
-    const updated = await platformService.updateLegalSetting(key, value);
+    let updated;
+    if (req.body.key && (req.body.value !== undefined || req.body.content !== undefined)) {
+      updated = await platformService.updateLegalSetting(req.body.key, req.body.value ?? req.body.content);
+    } else {
+      const entries = Object.entries(req.body);
+      for (const [k, v] of entries) {
+        if (typeof v === 'string') {
+          await platformService.updateLegalSetting(k, v);
+        }
+      }
+      updated = await platformService.getLegalSettings();
+    }
     return sendSuccess(res, updated, 'Setting updated successfully.');
   } catch (error) {
     next(error);

@@ -48,3 +48,13 @@ export async function toggleBlockSeller(req, res, next) {
     next(error);
   }
 }
+
+export async function deleteSeller(req, res, next) {
+  try {
+    const result = await adminSellerService.deleteSeller(req.params.id);
+    return sendSuccess(res, result, 'Seller deleted successfully.');
+  } catch (error) {
+    next(error);
+  }
+}
+

@@ -30,6 +30,7 @@ router.post('/seller-approvals/:id/reject', adminSellerController.rejectApplicat
 router.post('/seller-applications/:id/reject', adminSellerController.rejectApplication);
 router.get('/sellers', adminSellerController.getSellers);
 router.patch('/sellers/:id/block', adminSellerController.toggleBlockSeller);
+router.delete('/sellers/:id', adminSellerController.deleteSeller);
 
 // Category management
 router.get('/categories', categoryController.getAll);

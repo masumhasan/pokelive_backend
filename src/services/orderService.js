@@ -19,8 +19,14 @@ export async function createOrder(userId, { addressId, shippingAddressId, shippi
   if (!buyer) throw new NotFoundError('User not found.');
 
   const targetAddressId = addressId || shippingAddressId;
-  const address = await Address.findOne({ _id: targetAddressId, user: userId }).lean();
-  if (!address) throw new BadRequestError('Valid delivery address is required.');
+  let address;
+  if (targetAddressId) {
+    address = await Address.findOne({ _id: targetAddressId, user: userId }).lean();
+  }
+  if (!address) {
+    address = await Address.findOne({ user: userId, isDefault: true }).lean() || await Address.findOne({ user: userId }).lean();
+  }
+  if (!address) throw new BadRequestError('Valid delivery address is required. Please add an address first.');
 
   // Determine items to order
   let itemsToOrder = [];

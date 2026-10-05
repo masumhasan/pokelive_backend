@@ -117,3 +117,15 @@ export async function toggleBlockSeller(storeId) {
 
   return { id: store._id, isBlocked: store.isBlocked };
 }
+
+export async function deleteSeller(storeId) {
+  const store = await Store.findById(storeId);
+  if (!store) throw new NotFoundError('Store not found.');
+
+  if (store.user) {
+    await User.findByIdAndUpdate(store.user, { sellerStatus: 'none' });
+  }
+  await Store.findByIdAndDelete(storeId);
+  return { message: 'Seller deleted successfully.' };
+}
+

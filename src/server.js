@@ -87,9 +87,28 @@ async function seedRegularUser() {
       role: 'User',
       sellerStatus: 'none',
       status: 'Active',
-      avatar: 'https://i.pravatar.cc/150?img=33',
+      avatar: '',
     });
     console.log(`[Seed] Default Regular User created: ${userEmail} / Password123!`);
+  }
+}
+
+import { Category } from './models/Category.js';
+
+async function seedCategories() {
+  const count = await Category.countDocuments();
+  if (count === 0) {
+    const defaults = [
+      { name: 'Sneaker', image: 'https://ui-avatars.com/api/?name=Sneaker&background=16a34a&color=fff&size=64&bold=true' },
+      { name: 'Trading Cards', image: 'https://ui-avatars.com/api/?name=TC&background=9333ea&color=fff&size=64&bold=true' },
+      { name: 'Collectibles', image: 'https://ui-avatars.com/api/?name=Collectibles&background=e0620a&color=fff&size=64&bold=true' },
+      { name: 'Vintage', image: 'https://ui-avatars.com/api/?name=Vintage&background=ca8a04&color=fff&size=64&bold=true' },
+      { name: 'Watches', image: 'https://ui-avatars.com/api/?name=Watches&background=b91c1c&color=fff&size=64&bold=true' },
+      { name: 'Apparel', image: 'https://ui-avatars.com/api/?name=Apparel&background=0891b2&color=fff&size=64&bold=true' },
+      { name: 'General', image: 'https://ui-avatars.com/api/?name=General&background=444444&color=fff&size=64&bold=true' },
+    ];
+    await Category.insertMany(defaults);
+    console.log('[Seed] Default categories seeded successfully.');
   }
 }
 
@@ -98,9 +117,10 @@ async function startServer() {
   await seedAdminUser();
   await seedSellerUser();
   await seedRegularUser();
+  await seedCategories();
 
-  server.listen(env.port, () => {
-    console.log(`[PokeLive Backend] Running on port ${env.port} (${env.nodeEnv})`);
+  server.listen(env.port, '0.0.0.0', () => {
+    console.log(`[PokeLive Backend] Running on port ${env.port} (${env.nodeEnv}) on 0.0.0.0`);
   });
 }
 

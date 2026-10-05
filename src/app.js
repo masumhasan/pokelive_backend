@@ -50,7 +50,10 @@ v1.use('/streams', streamRoutes);
 v1.use('/raffles', raffleRoutes);
 v1.use('/notifications', notificationRoutes);
 v1.use('/upload', uploadRoutes);
+v1.use('/uploads', uploadRoutes);
 v1.use('/platform', platformRoutes);
+v1.use('/settings', platformRoutes);
+v1.use('/support', platformRoutes);
 v1.use('/stores', storeRoutes);
 v1.use('/admin', adminRoutes);
 

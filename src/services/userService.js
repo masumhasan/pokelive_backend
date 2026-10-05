@@ -5,22 +5,40 @@ import { NotFoundError, UnauthorizedError, BadRequestError } from '../utils/erro
 export async function getProfile(userId) {
   const user = await User.findById(userId).lean();
   if (!user) throw new NotFoundError('User not found.');
-  return user;
+  const isApproved = user.sellerStatus === 'approved';
+  return {
+    ...user,
+    isSeller: isApproved,
+    isApprovedSeller: isApproved,
+    showSellerBanner: !isApproved,
+  };
 }
 
 export async function updateProfile(userId, updates) {
-  const allowed = ['firstName', 'lastName', 'phone', 'avatar', 'city', 'address', 'gender'];
+  const allowed = ['firstName', 'lastName', 'name', 'phone', 'avatar', 'city', 'address', 'gender', 'email'];
   const sanitized = {};
   for (const key of allowed) {
-    if (updates[key] !== undefined) sanitized[key] = updates[key];
+    if (updates[key] !== undefined && updates[key] !== null) sanitized[key] = updates[key];
+  }
+  if (updates.contactNumber && !sanitized.phone) {
+    sanitized.phone = updates.contactNumber;
+  }
+  if (updates.avatarUrl && !sanitized.avatar) {
+    sanitized.avatar = updates.avatarUrl;
   }
   if (sanitized.firstName || sanitized.lastName) {
     const existing = await User.findById(userId).lean();
-    sanitized.name = `${sanitized.firstName || existing.firstName} ${sanitized.lastName || existing.lastName}`.trim();
+    sanitized.name = `${sanitized.firstName || existing?.firstName || ''} ${sanitized.lastName || existing?.lastName || ''}`.trim();
   }
 
   const updated = await User.findByIdAndUpdate(userId, { $set: sanitized }, { new: true }).lean();
-  return updated;
+  const isApproved = updated?.sellerStatus === 'approved';
+  return {
+    ...updated,
+    isSeller: isApproved,
+    isApprovedSeller: isApproved,
+    showSellerBanner: !isApproved,
+  };
 }
 
 export async function changePassword(userId, currentPassword, newPassword) {

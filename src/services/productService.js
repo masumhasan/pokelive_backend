@@ -1,11 +1,20 @@
 import { Product } from '../models/Product.js';
 import { Store } from '../models/Store.js';
+import { User } from '../models/User.js';
 import { Review } from '../models/Review.js';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors.js';
 
 export async function createProduct(userId, data) {
-  const store = await Store.findOne({ user: userId });
-  if (!store) throw new ForbiddenError('You must have an approved store to list products.');
+  let store = await Store.findOne({ user: userId });
+  if (!store) {
+    const user = await User.findById(userId);
+    store = await Store.create({
+      user: userId,
+      storeName: user?.firstName ? `${user.firstName}'s Store` : 'My Store',
+      sellerName: user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'Seller',
+      avatar: user?.avatar || '',
+    });
+  }
 
   const product = await Product.create({
     seller: userId,
@@ -24,7 +33,7 @@ export async function createProduct(userId, data) {
   return product;
 }
 
-export async function getSellerProducts(userId, { filter = 'All', search = '', page = 1, limit = 20 }) {
+export async function getSellerProducts(userId, { filter = 'All', search = '', page = 1, limit = 100 }) {
   const query = { seller: userId, status: { $ne: 'Archived' } };
   if (filter === 'Active') query.status = 'Active';
   if (filter === 'Stock Out') query.status = 'Stock Out';
@@ -45,7 +54,11 @@ export async function updateProduct(userId, productId, updates) {
 
   const allowed = ['title', 'description', 'category', 'price', 'quantity', 'packageWeight', 'images', 'status'];
   for (const key of allowed) {
-    if (updates[key] !== undefined) product[key] = updates[key];
+    if (updates[key] !== undefined) {
+      if (key === 'price') product.price = Number(updates.price);
+      else if (key === 'quantity') product.quantity = Number(updates.quantity);
+      else product[key] = updates[key];
+    }
   }
 
   await product.save();
