@@ -16,6 +16,12 @@ export async function createStream(userId, { title, category = 'Sneaker', coverI
 
   const sessionId = `stream_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
+  // Auto-end any previous active streams for this seller
+  await Stream.updateMany(
+    { seller: userId, status: 'Active' },
+    { $set: { status: 'Ended', endedAt: new Date() } }
+  );
+
   // Pre-create GetStream video call and chat channel
   await createGetStreamSession({
     sessionId,
