@@ -1,4 +1,5 @@
 import { Category } from '../models/Category.js';
+import { Product } from '../models/Product.js';
 import { NotFoundError, ConflictError } from '../utils/errors.js';
 
 export async function getAllCategories(search = '') {
@@ -22,13 +23,32 @@ export async function createCategory({ name, image }) {
 }
 
 export async function updateCategory(id, { name, image }) {
-  const updates = {};
-  if (name) updates.name = name;
-  if (image) updates.image = image;
+  const category = await Category.findById(id);
+  if (!category) throw new NotFoundError('Category not found.');
 
-  const updated = await Category.findByIdAndUpdate(id, { $set: updates }, { new: true }).lean();
-  if (!updated) throw new NotFoundError('Category not found.');
-  return updated;
+  const oldName = category.name;
+  if (name && name.trim().toLowerCase() !== oldName.toLowerCase()) {
+    const existing = await Category.findOne({
+      _id: { $ne: id },
+      name: { $regex: new RegExp(`^${name.trim()}$`, 'i') },
+    });
+    if (existing) throw new ConflictError('A category with this name already exists.');
+    category.name = name.trim();
+  } else if (name) {
+    category.name = name.trim();
+  }
+
+  if (image !== undefined && image !== null) {
+    category.image = image;
+  }
+
+  await category.save();
+
+  if (oldName !== category.name) {
+    await Product.updateMany({ category: oldName }, { $set: { category: category.name } });
+  }
+
+  return category.toObject();
 }
 
 export async function deleteCategory(id) {
