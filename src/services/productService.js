@@ -88,7 +88,9 @@ export async function getProductDetails(productId) {
 
 export async function listProducts({ search = '', category, storeId, page = 1, limit = 20 }) {
   const query = { status: 'Active' };
-  if (category) query.category = category;
+  if (category && category !== 'All') {
+    query.category = { $regex: new RegExp(`^${category.trim()}$`, 'i') };
+  }
   if (storeId) query.store = storeId;
   if (search) query.title = { $regex: search, $options: 'i' };
 

@@ -48,11 +48,13 @@ export async function createStream(userId, { title, category = 'Sneaker', coverI
 
   await stream.populate('featuredProducts');
   await stream.populate('activePinnedProduct');
+  await stream.populate('store', 'storeName sellerName avatar rating');
 
   const tokens = getStreamUserTokens(userId, 'host');
 
   return {
     stream,
+    store,
     tokens,
     apiKey: tokens.apiKey,
     streamToken: tokens.videoToken,
@@ -96,7 +98,9 @@ export async function pinProduct(userId, streamId, productId, io = null) {
 
 export async function getActiveStreams({ category, search = '', page = 1, limit = 20 }) {
   const query = { status: 'Active' };
-  if (category && category !== 'All') query.category = category;
+  if (category && category !== 'All') {
+    query.category = { $regex: new RegExp(`^${category.trim()}$`, 'i') };
+  }
   if (search) query.title = { $regex: search, $options: 'i' };
 
   const skip = (Number(page) - 1) * Number(limit);
