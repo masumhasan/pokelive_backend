@@ -63,7 +63,12 @@ function normalizeAddress(data) {
   if (!norm.firstName && norm.fullName) {
     const parts = norm.fullName.trim().split(' ');
     norm.firstName = parts[0] || 'User';
-    norm.lastName = parts.slice(1).join(' ') || 'Name';
+    norm.lastName = parts.slice(1).join(' ') || '';
+  }
+  if (!norm.firstName && norm.name) {
+    const parts = norm.name.trim().split(' ');
+    norm.firstName = parts[0] || 'User';
+    norm.lastName = parts.slice(1).join(' ') || '';
   }
   if (!norm.contactNumber && norm.phone) norm.contactNumber = norm.phone;
   if (!norm.streetAddress && norm.street) norm.streetAddress = norm.street;

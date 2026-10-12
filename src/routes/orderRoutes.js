@@ -7,6 +7,8 @@ const router = Router();
 router.use(authenticate);
 
 // Buyer order checkout and history
+router.get('/stripe-config', orderController.getStripeConfig);
+router.post('/payment-intent', orderController.createPaymentIntent);
 router.post('/checkout-summary', orderController.getSummary);
 router.post('/checkout', orderController.createOrder);
 router.post('/create', orderController.createOrder);

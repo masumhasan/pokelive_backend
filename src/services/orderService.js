@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { Order } from '../models/Order.js';
 import { Transaction } from '../models/Transaction.js';
 import { Product } from '../models/Product.js';
@@ -5,6 +6,7 @@ import { Store } from '../models/Store.js';
 import { Address } from '../models/Address.js';
 import { Cart } from '../models/Cart.js';
 import { User } from '../models/User.js';
+import * as stripeService from '../integrations/stripe/stripeService.js';
 import { BadRequestError, NotFoundError } from '../utils/errors.js';
 
 export async function calculateSummary({ subtotal = 0, shippingPartner = 'Royal Shipping' }) {
@@ -14,7 +16,7 @@ export async function calculateSummary({ subtotal = 0, shippingPartner = 'Royal 
   return { subtotal, platformFee, shippingFee, totalAmount };
 }
 
-export async function createOrder(userId, { addressId, shippingAddressId, shippingPartner = 'Royal Shipping', paymentMethod = 'Visa', directItem }) {
+export async function createOrder(userId, { addressId, shippingAddressId, shippingPartner = 'Royal Shipping', paymentMethod = 'card', paymentIntentId, directItem }) {
   const buyer = await User.findById(userId).lean();
   if (!buyer) throw new NotFoundError('User not found.');
 
@@ -33,11 +35,21 @@ export async function createOrder(userId, { addressId, shippingAddressId, shippi
   if (directItem) {
     const product = await Product.findById(directItem.productId);
     if (!product) throw new NotFoundError('Product not found.');
-    itemsToOrder.push({ product, quantity: directItem.quantity || 1, storeId: product.store });
+    let storeId = product.store;
+    if (!storeId) {
+      const store = await Store.findOne({ user: product.seller });
+      storeId = store?._id;
+    }
+    itemsToOrder.push({ product, quantity: Number(directItem.quantity) || 1, storeId });
   } else {
     const cart = await Cart.findOne({ user: userId }).populate('items.product');
-    if (!cart || cart.items.length === 0) throw new BadRequestError('Cart is empty.');
-    itemsToOrder = cart.items.map((i) => ({ product: i.product, quantity: i.quantity, storeId: i.product.store }));
+    const validItems = cart?.items?.filter((i) => i.product && i.product.status !== 'Archived') || [];
+    if (validItems.length === 0) throw new BadRequestError('Cart is empty.');
+    itemsToOrder = validItems.map((i) => ({
+      product: i.product,
+      quantity: i.quantity,
+      storeId: i.store || i.product.store,
+    }));
   }
 
   // 1. Concurrency Check: Atomically decrement stock
@@ -47,7 +59,7 @@ export async function createOrder(userId, { addressId, shippingAddressId, shippi
       const updated = await Product.findOneAndUpdate(
         { _id: item.product._id, quantity: { $gte: item.quantity }, status: { $ne: 'Archived' } },
         { $inc: { quantity: -item.quantity } },
-        { new: true }
+        { returnDocument: 'after' }
       );
       if (!updated) {
         throw new BadRequestError(`Product "${item.product.title}" has insufficient stock or is unavailable.`);
@@ -65,7 +77,7 @@ export async function createOrder(userId, { addressId, shippingAddressId, shippi
   // Group by store to create distinct orders
   const storeGroups = new Map();
   for (const item of itemsToOrder) {
-    const sId = item.storeId.toString();
+    const sId = (item.storeId || item.product?.store || item.product?.seller)?.toString() || 'default_store';
     if (!storeGroups.has(sId)) storeGroups.set(sId, []);
     storeGroups.get(sId).push(item);
   }
@@ -73,7 +85,16 @@ export async function createOrder(userId, { addressId, shippingAddressId, shippi
   const createdOrders = [];
 
   for (const [storeId, groupItems] of storeGroups.entries()) {
-    const store = await Store.findById(storeId).populate('user');
+    let store = null;
+    if (mongoose.Types.ObjectId.isValid(storeId)) {
+      store = await Store.findById(storeId).populate('user');
+    }
+    if (!store && groupItems[0]?.product?.seller) {
+      store = await Store.findOne({ user: groupItems[0].product.seller }).populate('user');
+    }
+    if (!store) {
+      store = await Store.findOne().populate('user');
+    }
     const orderItems = groupItems.map((g) => ({
       product: g.product._id,
       title: g.product.title,
@@ -89,13 +110,24 @@ export async function createOrder(userId, { addressId, shippingAddressId, shippi
     const orderId = `#PL-${Math.floor(1000 + Math.random() * 9000)}`;
     const txId = `#TX-pok-${Math.floor(10000 + Math.random() * 90000)}`;
 
+    // Process payment through Stripe (mock or real)
+    const payment = await stripeService.processPayment({
+      amount: summary.totalAmount,
+      currency: 'gbp',
+      buyerId: buyer._id,
+      orderId,
+      paymentIntentId,
+    });
+
+    const sellerId = store?.user?._id || store?.user || groupItems[0]?.product?.seller || buyer._id;
+
     const order = await Order.create({
       orderId,
       buyer: buyer._id,
       buyerName: `${buyer.firstName} ${buyer.lastName}`.trim(),
-      seller: store?.user?._id || store?.user,
+      seller: sellerId,
       sellerName: store?.storeName || 'Store',
-      store: store._id,
+      store: store?._id || groupItems[0]?.product?.store,
       items: orderItems,
       shippingAddress: address,
       shippingPartner,
@@ -112,14 +144,15 @@ export async function createOrder(userId, { addressId, shippingAddressId, shippi
       orderId: order.orderId,
       buyer: buyer._id,
       buyerName: `${buyer.firstName} ${buyer.lastName}`.trim(),
-      seller: store?.user?._id || store?.user,
+      seller: sellerId,
       sellerName: store?.storeName || 'Store',
       amount: summary.totalAmount,
       subtotal: summary.subtotal,
       platformFee: summary.platformFee,
       shippingFee: summary.shippingFee,
-      status: 'Success',
-      paymentMethod,
+      status: payment.success ? 'Success' : 'Processing',
+      paymentMethod: paymentMethod === 'card' ? 'Stripe (Card)' : paymentMethod,
+      stripeCode: payment.stripeCode,
     });
 
     // Update store balance and sales
@@ -178,3 +211,18 @@ export async function updateSellerOrderStatus(userId, orderId, status) {
   if (!order) throw new NotFoundError('Order not found.');
   return order;
 }
+
+export async function createPaymentIntent(userId, { amount, currency = 'gbp', metadata = {} }) {
+  const buyer = await User.findById(userId).lean();
+  if (!buyer) throw new NotFoundError('User not found.');
+  return stripeService.createPaymentIntent({
+    amount,
+    currency,
+    metadata: { ...metadata, userId: userId.toString(), buyerEmail: buyer.email },
+  });
+}
+
+export function getStripeConfig() {
+  return stripeService.getStripeConfig();
+}
+

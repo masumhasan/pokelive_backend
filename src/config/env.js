@@ -14,6 +14,8 @@ export const env = {
   awsSecretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
   awsRegion: process.env.AWS_REGION || 'eu-west-2',
   awsBucketName: (process.env.AWS_S3_BUCKET_NAME || '').trim(),
+  stripeSecretKey: process.env.STRIPE_SECRET_KEY || 'mock_stripe_sk_test_pokelive',
+  stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || 'mock_stripe_pk_test_pokelive',
 };
 
 // ponytail: validate required environment variables at boot to fail fast

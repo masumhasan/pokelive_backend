@@ -57,3 +57,22 @@ export async function updateOrderStatus(req, res, next) {
     next(error);
   }
 }
+
+export async function createPaymentIntent(req, res, next) {
+  try {
+    const intent = await orderService.createPaymentIntent(req.user._id, req.body);
+    return sendSuccess(res, intent, 'Payment intent created successfully.');
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getStripeConfig(req, res, next) {
+  try {
+    const config = orderService.getStripeConfig();
+    return sendSuccess(res, config);
+  } catch (error) {
+    next(error);
+  }
+}
+

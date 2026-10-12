@@ -1,5 +1,6 @@
 import { Cart } from '../models/Cart.js';
 import { Product } from '../models/Product.js';
+import { Store } from '../models/Store.js';
 import { NotFoundError, BadRequestError } from '../utils/errors.js';
 
 export async function getCart(userId) {
@@ -64,14 +65,23 @@ export async function addToCart(userId, { productId, quantity = 1 }) {
   if (!product || product.status === 'Archived') throw new NotFoundError('Product not found.');
   if (product.quantity < numQty) throw new BadRequestError('Insufficient product stock.');
 
+  let storeId = product.store;
+  if (!storeId) {
+    const store = (await Store.findOne({ user: product.seller })) || (await Store.findOne());
+    storeId = store?._id;
+  }
+
   let cart = await Cart.findOne({ user: userId });
   if (!cart) cart = new Cart({ user: userId, items: [] });
 
-  const existingIndex = cart.items.findIndex((item) => item.product.toString() === productId);
+  const existingIndex = cart.items.findIndex((item) => item.product?.toString() === productId);
   if (existingIndex > -1) {
-    cart.items[existingIndex].quantity += numQty;
+    cart.items[existingIndex].quantity = Math.min(
+      cart.items[existingIndex].quantity + numQty,
+      product.quantity
+    );
   } else {
-    cart.items.push({ product: product._id, store: product.store, quantity: numQty });
+    cart.items.push({ product: product._id, store: storeId, quantity: numQty });
   }
 
   await cart.save();

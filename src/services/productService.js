@@ -2,6 +2,7 @@ import { Product } from '../models/Product.js';
 import { Store } from '../models/Store.js';
 import { User } from '../models/User.js';
 import { Review } from '../models/Review.js';
+import { Category } from '../models/Category.js';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors.js';
 
 export async function createProduct(userId, data) {
@@ -80,9 +81,14 @@ export async function deleteProduct(userId, productId) {
 // ─── Public Queries ─────────────────────────────────────────────────────────
 export async function getProductDetails(productId) {
   const product = await Product.findOne({ _id: productId, status: { $ne: 'Archived' } })
-    .populate('store', 'storeName sellerName avatar rating reviewsCount liveStatus')
+    .populate('store', 'storeName sellerName avatar rating reviewsCount liveStatus coverImage storeBio dispatchLocation')
     .lean();
   if (!product) throw new NotFoundError('Product not found.');
+
+  if (product.category && /^[0-9a-fA-F]{24}$/.test(product.category)) {
+    const cat = await Category.findById(product.category).lean();
+    if (cat) product.categoryName = cat.name;
+  }
   return product;
 }
 
