@@ -20,5 +20,9 @@ router.get('/my-orders', orderController.getActiveOrders);
 // Seller sales orders management
 router.get('/seller', requireSeller, orderController.getSellerOrders);
 router.put('/seller/:id/status', requireSeller, orderController.updateOrderStatus);
+router.get('/seller/:id/shipping-label', requireSeller, orderController.getShippingLabel);
+router.post('/seller/:id/shipping-label', requireSeller, orderController.getShippingLabel);
+router.get('/seller/:id/shipping-label/pdf', requireSeller, orderController.downloadShippingLabelPdf);
+router.get('/seller/:id/shipping-label/png', requireSeller, orderController.downloadShippingLabelPng);
 
 export default router;

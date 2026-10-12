@@ -1,4 +1,5 @@
 import * as orderService from '../services/orderService.js';
+import * as shippingLabelService from '../services/shippingLabelService.js';
 import { sendSuccess } from '../utils/response.js';
 
 export async function getSummary(req, res, next) {
@@ -75,4 +76,40 @@ export async function getStripeConfig(req, res, next) {
     next(error);
   }
 }
+
+export async function getShippingLabel(req, res, next) {
+  try {
+    const label = await shippingLabelService.getShippingLabel(req.user._id, req.params.id);
+    return sendSuccess(res, label, 'Shipping label generated successfully.');
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function downloadShippingLabelPdf(req, res, next) {
+  try {
+    const label = await shippingLabelService.getShippingLabel(req.user._id, req.params.id);
+    const pdfBuf = shippingLabelService.generatePdf(label);
+    const filename = `shipping-label-${label.orderId.replace(/[^a-zA-Z0-9]/g, '')}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.status(200).send(pdfBuf);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function downloadShippingLabelPng(req, res, next) {
+  try {
+    const label = await shippingLabelService.getShippingLabel(req.user._id, req.params.id);
+    const pngBuf = shippingLabelService.generatePng(label);
+    const filename = `shipping-label-${label.orderId.replace(/[^a-zA-Z0-9]/g, '')}.png`;
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.status(200).send(pngBuf);
+  } catch (error) {
+    next(error);
+  }
+}
+
 
