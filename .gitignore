@@ -4,10 +4,7 @@ jspm_packages/
 package-lock.json.bak
 
 # Environment and Secrets (Never commit credentials)
-.env
-.env.*
 !.env.example
-.env.local
 .env.development.local
 .env.test.local
 .env.production.local
@@ -52,10 +49,13 @@ public/uploads/
 ehthumbs.db
 Thumbs.db
 .idea/
-.vscode/
 *.suo
 *.ntvs*
 *.njsproj
 *.swp
 *.swo
 *~
+branch_structure.json
+temp_auto_push.bat
+temp_interactive_push.bat
+config.bat
